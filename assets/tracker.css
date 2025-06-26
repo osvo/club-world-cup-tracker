@@ -1,47 +1,34 @@
-/* -------- basic reset & typography (unchanged bits) -------- */
+/* base styles (same) */
 * { box-sizing: border-box; margin: 0; }
 body {
   font-family: 'Poppins', system-ui, sans-serif;
-  background: linear-gradient(135deg, #f5f7fa 0%, #eff3f8 100%);
-  color: #222;
-  display: flex;
-  flex-direction: column;
-  min-height: 100vh;
+  background: linear-gradient(135deg,#f5f7fa 0%,#eff3f8 100%);
+  color:#222; display:flex; flex-direction:column; min-height:100vh;
 }
-header { text-align: center; padding: 2rem 1rem 0.5rem; }
-h1 { font-size: clamp(1.6rem, 4vw, 2.4rem); font-weight: 600; line-height: 1.2; }
-.subtitle { color: #555; margin-top: 0.25rem; }
+header{ text-align:center; padding:2rem 1rem .5rem }
+h1{ font-size:clamp(1.6rem,4vw,2.4rem); font-weight:600; line-height:1.2 }
+.subtitle{ color:#555; margin-top:.25rem }
+footer{ text-align:center; font-size:.85rem; padding:1rem; color:#666 }
 
-main { flex: 1 0 auto; display: flex; flex-direction: column; align-items: center; gap: 0.75rem; padding: 1rem 3vw 2rem; }
-
-footer { text-align: center; font-size: 0.85rem; padding: 1rem; color: #666; }
-
-/* -------- new / tweaked bits -------- */
-.chart-wrap {
-  width: 100%;
-  max-width: 1400px;         /* wider than before */
-  height: 500px;             /* taller chart */
-  background: #fff;
-  border-radius: 0.75rem;
-  box-shadow: 0 4px 12px rgb(0 0 0 / 0.1);
-  padding: 1rem;
+main{
+  flex:1 0 auto;
+  display:flex; flex-direction:column; align-items:center; gap:.8rem;
+  padding:1rem 3vw 2rem;
 }
 
-canvas { width: 100%; height: 100%; }
-
-#toolbar {
-  width: 100%;
-  max-width: 1400px;
-  display: flex;
-  justify-content: flex-end;
+/* toolbar */
+#toolbar{ width:100%; max-width:1400px; display:flex; justify-content:flex-end }
+#resetZoom{
+  padding:.4rem .9rem; font:inherit; cursor:pointer;
+  border:1px solid #ccc; border-radius:.5rem; background:#f7f8fa;
 }
+#resetZoom:hover{ background:#e9eaed }
 
-#resetZoom {
-  padding: 0.4rem 0.9rem;
-  font: inherit;
-  cursor: pointer;
-  border: 1px solid #ccc;
-  border-radius: 0.5rem;
-  background: #f7f8fa;
+/* chart wrapper */
+.chart-wrap{
+  width:100%; max-width:1400px; height:500px;
+  background:#fff; border-radius:.75rem;
+  box-shadow:0 4px 12px rgb(0 0 0 / .1);
+  padding:1rem;
 }
-#resetZoom:hover { background: #e9eaed; }
+canvas{ width:100%; height:100% }
