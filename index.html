@@ -1,0 +1,34 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Club World Cup Tracker</title>
+
+  <!-- ----------  external libs  ---------- -->
+  <link  rel="stylesheet" href="https://cdn.datatables.net/2/dt.dataTables.min.css">
+  <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.3/papaparse.min.js"></script>
+  <script src="https://cdn.datatables.net/2/dt.dataTables.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.5.0/dist/chart.umd.min.js"></script>
+
+  <!-- ----------  local styles  ----------- -->
+  <link rel="stylesheet" href="assets/tracker.css">
+</head>
+<body>
+  <h1>🏆 FIFA Club World Cup 2025 – Score-Tracker</h1>
+
+  <div id="filters">
+    <label>Date from <input type="date" id="fromDate"></label>
+    <label>Date to <input type="date" id="toDate"></label>
+    <label>Team <input type="text" id="teamFilter" placeholder="e.g. Chelsea"></label>
+    <button id="applyFilters">Apply</button>
+  </div>
+
+  <table id="matches" class="display"></table>
+
+  <h2>Cumulative points</h2>
+  <canvas id="cumulative" height="120"></canvas>
+
+  <!-- ----------  main JS  ---------------- -->
+  <script src="assets/tracker.js"></script>
+</body>
+</html>

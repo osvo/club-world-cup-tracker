@@ -1,0 +1,30 @@
+body {
+  font-family: system-ui, sans-serif;
+  margin: 2rem 5vw;
+  line-height: 1.4;
+}
+
+#filters {
+  margin-bottom: 1rem;
+  display: flex;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+#filters input[type="date"],
+#filters input[type="text"] {
+  padding: 0.25rem 0.5rem;
+}
+
+#filters button {
+  padding: 0.25rem 0.75rem;
+  cursor: pointer;
+}
+
+h1, h2 {
+  margin: 1.5rem 0 0.75rem;
+}
+
+table.dataTable thead th {
+  white-space: nowrap;
+}
