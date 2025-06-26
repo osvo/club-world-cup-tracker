@@ -1,109 +1,85 @@
 /* ---------------------------------------------------------
-   Helper: score-awarding function
+   Points helper
 --------------------------------------------------------- */
 function points(pred, actual) {
-  if (!pred) return 0;                         // empty cell → 0
+  if (!pred) return 0;
+
   const [ph, pa] = pred.split('-').map(Number);
   const [ah, aa] = actual.split('-').map(Number);
 
-  // exact score
-  if (ph === ah && pa === aa) return 5;
+  if (ph === ah && pa === aa) return 5;                     // exact
 
-  const predDiff   = ph - pa;
-  const actDiff    = ah - aa;
+  const predDiff = ph - pa;
+  const actDiff  = ah - aa;
 
-  // same goal diff  (draws automatically included)
-  if (predDiff === actDiff) return 3;
+  if (predDiff === actDiff) return 3;                       // same diff (draws included)
 
-  // correct outcome (win/lose/draw)
-  if (Math.sign(predDiff) === Math.sign(actDiff)) return 2;
+  if (Math.sign(predDiff) === Math.sign(actDiff)) return 2; // same outcome
 
   return 0;
 }
 
 /* ---------------------------------------------------------
-   Main IIFE
+   Build cumulative-points dataset & draw chart
 --------------------------------------------------------- */
 (async () => {
-  /* ---------- 1. load CSV ---------- */
   const resp = await fetch('data.csv?nocache=' + Date.now());
   const csv  = await resp.text();
   const { data } = Papa.parse(csv, { header: true, skipEmptyLines: true });
 
-  /* ---------- 2. work out friend list ---------- */
-  const friendNames = Object.keys(data[0]).slice(4);   // cols after 'score'
+  // who are the friends? → columns after 'score'
+  const friendNames = Object.keys(data[0]).slice(4);
 
-  /* ---------- 3. calculate points per row ---------- */
-  data.forEach(r => {
-    friendNames.forEach(f => {
-      r[`${f}_pts`] = points(r[f], r.score);
-    });
-  });
-
-  /* ---------- 4. DataTable ---------- */
-  const columns = [
-    { title: 'Date',    data: 'date'     },
-    { title: 'Home',    data: 'local'    },
-    { title: 'Away',    data: 'visitor'  },
-    { title: 'Score',   data: 'score'    },
-    ...friendNames.flatMap(f => ([
-      { title: `${f} pick`, data: f },
-      { title: `${f} pts`,  data: `${f}_pts` }
-    ]))
-  ];
-
-  // initialise table
-  const table = new DataTable('#matches', {
-    data,
-    columns,
-    order: [[0, 'asc']],
-    pageLength: 25
-  });
-
-  /* ---------- 5. custom filtering ---------- */
-  const filterFn = row => {
-    const from = document.getElementById('fromDate').value;
-    const to   = document.getElementById('toDate').value;
-    const team = document.getElementById('teamFilter').value.trim().toLowerCase();
-
-    if (from && row.date < from) return false;
-    if (to   && row.date > to)   return false;
-    if (team && !(
-          row.local.toLowerCase().includes(team) ||
-          row.visitor.toLowerCase().includes(team))) return false;
-    return true;
-  };
-  DataTable.ext.search.push(filterFn);
-  document.getElementById('applyFilters').onclick = () => table.draw();
-
-  /* ---------- 6. cumulative-points dataset ---------- */
+  /* ---- cumulative totals per date ---- */
   const dates = [...new Set(data.map(r => r.date))].sort();
-  const cum = Object.fromEntries(friendNames.map(f => [f, Array(dates.length).fill(0)]));
+  const totals = Object.fromEntries(friendNames.map(f => [f, Array(dates.length).fill(0)]));
 
   dates.forEach((d, i) => {
-    const todays = data.filter(r => r.date === d);
+    const todaysRows = data.filter(r => r.date === d);
+
     friendNames.forEach(f => {
-      const ptsToday = todays.reduce((s, r) => s + r[`${f}_pts`], 0);
-      cum[f][i] = (cum[f][i-1] || 0) + ptsToday;
+      const ptsToday = todaysRows.reduce((sum, r) => sum + points(r[f], r.score), 0);
+      totals[f][i] = (totals[f][i - 1] || 0) + ptsToday;
     });
   });
 
-  /* ---------- 7. Chart.js line chart ---------- */
+  /* ---- draw the line chart ---- */
   const ctx = document.getElementById('cumulative');
+
+  // light, visually distinct colours for each friend
+  const colour = idx => `hsl(${(idx * 57) % 360} 70% 50%)`;   // simple palette
+
   new Chart(ctx, {
     type: 'line',
     data: {
       labels: dates,
-      datasets: friendNames.map(f => ({
+      datasets: friendNames.map((f, i) => ({
         label: f,
-        data: cum[f],
-        tension: 0.25
+        data: totals[f],
+        borderColor: colour(i),
+        backgroundColor: colour(i) + ' / 0.15',
+        tension: 0.25,
+        pointRadius: 3
       }))
     },
     options: {
       responsive: true,
-      plugins: { legend: { position: 'bottom' } },
-      scales: { x: { ticks: { autoSkip: true } } }
+      plugins: {
+        legend: {
+          position: 'bottom',
+          labels: { usePointStyle: true, boxWidth: 8 }
+        },
+        tooltip: {
+          callbacks: {
+            // show "N pts on DATE" tooltip
+            label: ctx => `${ctx.dataset.label}: ${ctx.parsed.y} pts`
+          }
+        }
+      },
+      scales: {
+        x: { title: { display: true, text: 'Match date' } },
+        y: { title: { display: true, text: 'Total points' }, beginAtZero: true }
+      }
     }
   });
 })();

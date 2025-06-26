@@ -1,34 +1,38 @@
 <!doctype html>
 <html lang="en">
 <head>
-  <meta charset="utf-8">
-  <title>Club World Cup Tracker</title>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Club World Cup – Predictor League</title>
 
-  <!-- ----------  external libs  ---------- -->
-  <link  rel="stylesheet" href="https://cdn.datatables.net/2/dt.dataTables.min.css">
+  <!-- Google Font for a nicer look -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600&display=swap" rel="stylesheet">
+
+  <!-- External libs: PapaParse (CSV) & Chart.js -->
   <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.3/papaparse.min.js"></script>
-  <script src="https://cdn.datatables.net/2/dt.dataTables.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.5.0/dist/chart.umd.min.js"></script>
 
-  <!-- ----------  local styles  ----------- -->
-  <link rel="stylesheet" href="assets/tracker.css">
+  <!-- Local styles -->
+  <link rel="stylesheet" href="assets/tracker.css" />
 </head>
+
 <body>
-  <h1>🏆 FIFA Club World Cup 2025 – Score-Tracker</h1>
+  <header>
+    <h1>🏆  Club World Cup — Friends Predictor League</h1>
+    <p class="subtitle">Live cumulative points</p>
+  </header>
 
-  <div id="filters">
-    <label>Date from <input type="date" id="fromDate"></label>
-    <label>Date to <input type="date" id="toDate"></label>
-    <label>Team <input type="text" id="teamFilter" placeholder="e.g. Chelsea"></label>
-    <button id="applyFilters">Apply</button>
-  </div>
+  <main>
+    <canvas id="cumulative" height="150"></canvas>
+  </main>
 
-  <table id="matches" class="display"></table>
+  <footer>
+    <p>Updates automatically whenever <code>data.csv</code> changes.</p>
+  </footer>
 
-  <h2>Cumulative points</h2>
-  <canvas id="cumulative" height="120"></canvas>
-
-  <!-- ----------  main JS  ---------------- -->
+  <!-- Main logic -->
   <script src="assets/tracker.js"></script>
 </body>
 </html>
