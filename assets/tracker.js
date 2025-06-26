@@ -1,55 +1,46 @@
 /* ---------------------------------------------------------
-   Points helper
+   Points helper (unchanged)
 --------------------------------------------------------- */
 function points(pred, actual) {
   if (!pred) return 0;
-
   const [ph, pa] = pred.split('-').map(Number);
   const [ah, aa] = actual.split('-').map(Number);
-
-  if (ph === ah && pa === aa) return 5;                     // exact
-
-  const predDiff = ph - pa;
-  const actDiff  = ah - aa;
-
-  if (predDiff === actDiff) return 3;                       // same diff (draws included)
-
-  if (Math.sign(predDiff) === Math.sign(actDiff)) return 2; // same outcome
-
+  if (ph === ah && pa === aa) return 5;
+  const dPred = ph - pa, dAct = ah - aa;
+  if (dPred === dAct) return 3;
+  if (Math.sign(dPred) === Math.sign(dAct)) return 2;
   return 0;
 }
 
 /* ---------------------------------------------------------
-   Build cumulative-points dataset & draw chart
+   Build dataset & draw interactive chart
 --------------------------------------------------------- */
 (async () => {
-  const resp = await fetch('data.csv?nocache=' + Date.now());
-  const csv  = await resp.text();
+  const csv = await (await fetch('data.csv?nocache=' + Date.now())).text();
   const { data } = Papa.parse(csv, { header: true, skipEmptyLines: true });
 
-  // who are the friends? → columns after 'score'
   const friendNames = Object.keys(data[0]).slice(4);
+  if (friendNames.length === 0) return;   // nothing to plot
 
-  /* ---- cumulative totals per date ---- */
-  const dates = [...new Set(data.map(r => r.date))].sort();
+  const dates  = [...new Set(data.map(r => r.date))].sort();
   const totals = Object.fromEntries(friendNames.map(f => [f, Array(dates.length).fill(0)]));
 
   dates.forEach((d, i) => {
-    const todaysRows = data.filter(r => r.date === d);
-
+    const todays = data.filter(r => r.date === d);
     friendNames.forEach(f => {
-      const ptsToday = todaysRows.reduce((sum, r) => sum + points(r[f], r.score), 0);
-      totals[f][i] = (totals[f][i - 1] || 0) + ptsToday;
+      const today = todays.reduce((s, r) => s + points(r[f], r.score), 0);
+      totals[f][i] = (totals[f][i-1] || 0) + today;
     });
   });
 
-  /* ---- draw the line chart ---- */
+  /* ---- Chart.js ---- */
   const ctx = document.getElementById('cumulative');
+  const colour = i => `hsl(${(i * 57) % 360} 70% 50%)`;
 
-  // light, visually distinct colours for each friend
-  const colour = idx => `hsl(${(idx * 57) % 360} 70% 50%)`;   // simple palette
+  // Register the zoom plugin (already loaded from CDN)
+  Chart.register(ChartZoom);
 
-  new Chart(ctx, {
+  const chart = new Chart(ctx, {
     type: 'line',
     data: {
       labels: dates,
@@ -59,20 +50,31 @@ function points(pred, actual) {
         borderColor: colour(i),
         backgroundColor: colour(i) + ' / 0.15',
         tension: 0.25,
-        pointRadius: 3
+        pointRadius: 4,
+        pointHoverRadius: 6
       }))
     },
     options: {
       responsive: true,
+      maintainAspectRatio: false,     // let CSS decide the height
       plugins: {
-        legend: {
-          position: 'bottom',
-          labels: { usePointStyle: true, boxWidth: 8 }
-        },
+        legend: { position: 'bottom', labels: { usePointStyle: true, boxWidth: 8 } },
         tooltip: {
-          callbacks: {
-            // show "N pts on DATE" tooltip
-            label: ctx => `${ctx.dataset.label}: ${ctx.parsed.y} pts`
+          callbacks: { label: c => `${c.dataset.label}: ${c.parsed.y} pts` }
+        },
+        zoom: {
+          limits: {
+            y: { min: 0 }   // never pan below 0 pts
+          },
+          pan: {
+            enabled: true,
+            mode: 'xy',
+            modifierKey: 'ctrl',   // ctrl+drag to pan (avoids accidental drags)
+          },
+          zoom: {
+            wheel: { enabled: true },
+            pinch: { enabled: true },
+            mode: 'xy'
           }
         }
       },
@@ -82,4 +84,7 @@ function points(pred, actual) {
       }
     }
   });
+
+  /* ---- Reset zoom button ---- */
+  document.getElementById('resetZoom').onclick = () => chart.resetZoom();
 })();

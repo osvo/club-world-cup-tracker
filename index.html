@@ -5,34 +5,47 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Club World Cup – Predictor League</title>
 
-  <!-- Google Font for a nicer look -->
+  <!-- Google Font -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600&display=swap" rel="stylesheet">
 
-  <!-- External libs: PapaParse (CSV) & Chart.js -->
-  <script defer src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
-  <script defer src="https://cdn.jsdelivr.net/npm/chart.js@4.5.0/dist/chart.umd.min.js"></script>
-
   <!-- Local styles -->
   <link rel="stylesheet" href="assets/tracker.css" />
+
+  <!-- ─────────  JS libs (deferred) ───────── -->
+  <!-- Papa Parse – local copy (works even if CDN blocked) -->
+  <script defer src="assets/papaparse.min.js"></script>
+
+  <!-- Chart.js core -->
+  <script defer src="https://cdn.jsdelivr.net/npm/chart.js@4.5.0/dist/chart.umd.min.js"></script>
+  <!-- Chart.js zoom/pan plugin -->
+  <script defer src="https://cdn.jsdelivr.net/npm/chartjs-plugin-zoom@2.0.1/dist/chartjs-plugin-zoom.min.js"></script>
+
+  <!-- Your main logic – must be last -->
+  <script defer src="assets/tracker.js"></script>
 </head>
 
 <body>
   <header>
-    <h1>🏆  Club World Cup — Friends Predictor League</h1>
+    <h1>🏆 Club World Cup — Friends Predictor League</h1>
     <p class="subtitle">Live cumulative points</p>
   </header>
 
   <main>
-    <canvas id="cumulative" height="150"></canvas>
+    <!-- Toolbar -->
+    <div id="toolbar">
+      <button id="resetZoom">Reset zoom</button>
+    </div>
+
+    <!-- Chart -->
+    <div class="chart-wrap">
+      <canvas id="cumulative"></canvas>
+    </div>
   </main>
 
   <footer>
     <p>Updates automatically whenever <code>data.csv</code> changes.</p>
   </footer>
-
-  <!-- Main logic -->
-  <script defer src="assets/tracker.js"></script>
 </body>
 </html>
