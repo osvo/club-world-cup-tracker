@@ -34,17 +34,17 @@
 
   <main class="dashboard">
     <!-- chart -->
-    <div class="chart-wrap">
+    <div class="chart-wrap" id="chartPane">
       <canvas id="cumulative"></canvas>
-      <div id="toolbar">
-        <button id="resetZoom">Reset zoom</button>
-      </div>
+      <div id="toolbar"><button id="resetZoom">Reset zoom</button></div>
     </div>
 
-    <!-- table -->
-    <div class="table-wrap">
-      <div id="pts-legend"></div>
+    <!-- draggable splitter -->
+    <div class="splitter" id="dragBar"></div>
 
+    <!-- table -->
+    <div class="table-wrap" id="tablePane">
+      <div id="pts-legend"></div>
       <table id="leaderboard" class="display"></table>
     </div>
   </main>
