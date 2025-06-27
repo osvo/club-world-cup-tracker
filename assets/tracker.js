@@ -115,9 +115,11 @@ function colourForTotal(val, min, max) {
      4.  Colour legend (0-5 pts)
   ======================================================= */
   const legend = document.getElementById('pts-legend');
-  legend.innerHTML = [0,1,2,3,4,5].map(pts =>
-    `<span class="legend-box" style="background:${colourForPts(pts)}"></span>${pts}`
-  ).join(' ');
+  if (legend) {
+    legend.innerHTML = [0,1,2,3,4,5].map(pts =>
+      `<span class="legend-box" style="background:${colourForPts(pts)}"></span>${pts}`
+    ).join(' ');
+  }
 
   /* =======================================================
      5.  Build full match-table data & column config
