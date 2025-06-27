@@ -1,120 +1,162 @@
-/* ---------- helpers ------------------------------------------------------ */
+/* =========================================================
+   1.  Helpers
+========================================================= */
+// 1-a  points awarded for a prediction
 function points(pred, actual) {
   if (!pred) return 0;
   const [ph, pa] = pred.split('-').map(Number);
   const [ah, aa] = actual.split('-').map(Number);
-  if (ph === ah && pa === aa) return 5;
+  if (ph === ah && pa === aa) return 5;                    // exact
   const dPred = ph - pa, dAct = ah - aa;
-  if (dPred === dAct) return 3;
-  if (Math.sign(dPred) === Math.sign(dAct)) return 2;
+  if (dPred === dAct) return 3;                            // same diff
+  if (Math.sign(dPred) === Math.sign(dAct)) return 2;      // same outcome
   return 0;
 }
 
-/* colour scale: points → bg colour */
-const ptsColor = { 0:'#ff6767', 2:'#f7c143', 3:'#b7e061', 5:'#28a745' };
+// 1-b  cell colour for an individual prediction (0-5 pts)
+function colourForPts(pts) {
+  const hues = { 0: 0, 1: 20, 2: 40, 3: 60, 4: 90, 5: 120 };   // red→green
+  return `hsl(${hues[pts]} 75% 55%)`;
+}
 
-/* ---------- main --------------------------------------------------------- */
+// 1-c  line / legend colour for overall totals (red-green gradient)
+function colourForTotal(val, min, max) {
+  if (max === min) return 'hsl(60 70% 50%)';
+  const ratio = (val - min) / (max - min);          // 0-1
+  return `hsl(${ratio * 120} 70% 50%)`;
+}
+
+/* =========================================================
+   2.  Main: load CSV, build data structures
+========================================================= */
 (async () => {
-  const csv = await (await fetch('data.csv?nocache=' + Date.now())).text();
-  const { data } = Papa.parse(csv, { header:true, skipEmptyLines:true });
+  const csvText = await (await fetch('data.csv?nocache=' + Date.now())).text();
+  const { data } = Papa.parse(csvText, { header: true, skipEmptyLines: true });
 
-  const friends = Object.keys(data[0]).slice(4);
-  if (!friends.length) return;
+  const friends = Object.keys(data[0]).slice(4);          // columns after 'score'
+  if (!friends.length) return;                            // nothing to show
 
-  /* ---- cumulative totals / latest ----- */
-  const dates = [...new Set(data.map(r => r.date))].sort();
-  const totals = Object.fromEntries(friends.map(f => [f, Array(dates.length).fill(0)]));
-  dates.forEach((d,i)=>{
-    const todayRows = data.filter(r=>r.date===d);
-    friends.forEach(f=>{
-      const todayPts = todayRows.reduce((s,r)=>s+points(r[f],r.score),0);
-      totals[f][i] = (totals[f][i-1]||0)+todayPts;
+  /* ---- per-match scoring & enrichment ---- */
+  data.forEach(r => {
+    r.match = `${r.local} vs ${r.visitor}`;
+    friends.forEach(f => {
+      r[`${f}_pts`] = points(r[f], r.score);
     });
   });
-  const latest = friends.map(f=>totals[f].at(-1));
-  const minPts = Math.min(...latest), maxPts = Math.max(...latest);
 
-  /* ---- CHART ------------------------------------------------------------ */
+  /* ---- cumulative totals for chart ---- */
+  const dates  = [...new Set(data.map(r => r.date))].sort();
+  const totals = Object.fromEntries(friends.map(f => [f, Array(dates.length).fill(0)]));
+
+  dates.forEach((d, i) => {
+    const todays = data.filter(r => r.date === d);
+    friends.forEach(f => {
+      const todayPts = todays.reduce((s, r) => s + r[`${f}_pts`], 0);
+      totals[f][i]   = (totals[f][i-1] || 0) + todayPts;
+    });
+  });
+
+  const latestTotals = friends.map(f => totals[f].at(-1));
+  const minPts = Math.min(...latestTotals);
+  const maxPts = Math.max(...latestTotals);
+
+  /* =======================================================
+     3.  Chart.js  (left-drag pan, wheel/pinch zoom)
+  ======================================================= */
   Chart.register(ChartZoom);
   const ctx = document.getElementById('cumulative');
-  const chart = new Chart(ctx,{
-    type:'line',
-    data:{
-      labels:dates,
-      datasets:friends.map((f,i)=>{
-        const c = ptsColor[5 - Math.round((maxPts-latest[i])*5/(maxPts-minPts||1))] || '#888';
+
+  const chart = new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels: dates,
+      datasets: friends.map((f, i) => {
+        const col = colourForTotal(latestTotals[i], minPts, maxPts);
         return {
-          label:f,
-          data:totals[f],
-          borderColor:c,
-          backgroundColor:c+'33',
-          pointBackgroundColor:c,
-          tension:.25, pointRadius:5, pointHoverRadius:7
+          label: f,
+          data: totals[f],
+          borderColor: col,
+          backgroundColor: `${col} / 0.25`,
+          pointBackgroundColor: col,
+          tension: 0.25,
+          pointRadius: 4,
+          pointHoverRadius: 6
         };
       })
     },
-    options:{
-      responsive:true, maintainAspectRatio:false,
-      plugins:{
-        legend:{position:'bottom',labels:{usePointStyle:true,boxWidth:8}},
-        tooltip:{callbacks:{label:c=>`${c.dataset.label}: ${c.parsed.y} pts`}},
-        zoom:{
-          pan:{enabled:true,mode:'xy'},               // ← left-click drag
-          zoom:{wheel:{enabled:true},pinch:{enabled:true},mode:'xy'}
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend:  { position: 'bottom', labels: { usePointStyle: true, boxWidth: 8 } },
+        tooltip: { callbacks: { label: c => `${c.dataset.label}: ${c.parsed.y} pts` } },
+        zoom: {
+          pan:  {
+            enabled: true,
+            mode: 'xy',
+            threshold: 3,           // pixels before pan starts
+            modifierKey: null,      // left-click only, no Ctrl/Alt
+            onPanStart: () => ctx.style.cursor = 'grabbing',
+            onPanComplete: () => ctx.style.cursor = 'grab'
+          },
+          zoom: { wheel: { enabled:true }, pinch:{ enabled:true }, mode:'xy' }
         }
       },
-      scales:{
-        x:{title:{display:true,text:'Match date'}},
-        y:{title:{display:true,text:'Total points'},beginAtZero:true}
+      scales: {
+        x: { title: { display: true, text: 'Match date' } },
+        y: { title: { display: true, text: 'Total points' }, beginAtZero: true }
       }
     }
   });
-  document.getElementById('resetZoom').onclick=()=>chart.resetZoom();
+  ctx.style.cursor = 'grab';                                   // default
+  document.getElementById('resetZoom').onclick = () => chart.resetZoom();
 
-  /* tweak cursor while panning */
-  ctx.addEventListener('mousedown',()=>ctx.style.cursor='grabbing');
-  window.addEventListener('mouseup',()=>ctx.style.cursor='grab');
+  /* =======================================================
+     4.  Colour legend (0-5 pts)
+  ======================================================= */
+  const legend = document.getElementById('pts-legend');
+  legend.innerHTML = [0,1,2,3,4,5].map(pts =>
+    `<span class="legend-box" style="background:${colourForPts(pts)}"></span>${pts}`
+  ).join(' ');
 
-  /* ---- MATCH TABLE ------------------------------------------------------ */
-  // build rows
-  const tableRows = data.map((r,idx)=>{
-    const rowObj = {
-      idx: idx+1,
-      date: r.date,
-      match: `${r.local} vs ${r.visitor}`,
-      actual: r.score
-    };
-    friends.forEach(f=>{
-      const pts = points(r[f],r.score);
-      rowObj[f] = {
-        text: r[f] || '—',
-        pts
-      };
+  /* =======================================================
+     5.  Build full match-table data & column config
+  ======================================================= */
+  const tableData = data.map(r => {
+    const row = { date: r.date, match: r.match, actual: r.score };
+    friends.forEach(f => {
+      row[f]       = r[f] || '';
+      row[`${f}_pts`] = r[`${f}_pts`];
     });
-    return rowObj;
+    return row;
   });
 
-  // DataTable columns
   const columns = [
-    { title:'#',      data:'idx'   },
-    { title:'Date',   data:'date'  },
-    { title:'Match',  data:'match' },
-    { title:'Result', data:'actual' },
-    ...friends.map(f=>({
-        title:f,
-        data:`${f}`,
-        render: cell => {
-          const bg = ptsColor[cell.pts] || '#ddd';
-          return `<span class="cell-pred" style="background:${bg}">${cell.text}</span>`;
-        }
+    { title: 'Date',   data: 'date' },
+    { title: 'Match',  data: 'match' },
+    { title: 'Score',  data: 'actual' },
+    ...friends.map(f => ({
+      title: f,
+      data: f,
+      createdCell: (td, cellData, rowData) => {
+        const pts = rowData[`${f}_pts`];
+        td.style.background = colourForPts(pts);
+        td.style.color = '#000';
+        td.title = `${pts} pts`;
+      }
     }))
   ];
 
-  new DataTable('#leaderboard',{
-    data:tableRows,
+  /* =======================================================
+     6.  DataTable: vertical scroll (60 vh) + horizontal scroll
+  ======================================================= */
+  new DataTable('#leaderboard', {
+    data: tableData,
     columns,
-    paging:false, searching:false, info:false,
-    order:[[0,'asc']],
-    scrollX:true
+    order: [[0, 'asc']],
+    paging: false,
+    scrollY: '60vh',
+    scrollX: true,
+    scrollCollapse: true
   });
 })();
