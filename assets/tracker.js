@@ -1,4 +1,4 @@
-/* -------- points helper (unchanged) -------- */
+/* ---------- scoring helper ---------- */
 function points(pred, actual) {
   if (!pred) return 0;
   const [ph, pa] = pred.split('-').map(Number);
@@ -10,7 +10,15 @@ function points(pred, actual) {
   return 0;
 }
 
-/* ---- build data + interactive chart ---- */
+/* ---------- colour util: value→HSL (red-yellow-green) ---------- */
+function colourFor(val, min, max) {
+  if (max === min) return 'hsl(60 70% 50%)';     // neutral yellow
+  const ratio = (val - min) / (max - min);       // 0→1
+  const hue = 0 + (120 * ratio);                 // 0=red → 120=green
+  return `hsl(${hue} 70% 50%)`;
+}
+
+/* ---------- main ---------- */
 (async () => {
   const csv = await (await fetch('data.csv?nocache=' + Date.now())).text();
   const { data } = Papa.parse(csv, { header: true, skipEmptyLines: true });
@@ -18,7 +26,8 @@ function points(pred, actual) {
   const friends = Object.keys(data[0]).slice(4);
   if (!friends.length) return;
 
-  const dates  = [...new Set(data.map(r => r.date))].sort();
+  /* ----- cumulative totals ----- */
+  const dates = [...new Set(data.map(r => r.date))].sort();
   const totals = Object.fromEntries(friends.map(f => [f, Array(dates.length).fill(0)]));
 
   dates.forEach((d, i) => {
@@ -29,44 +38,68 @@ function points(pred, actual) {
     });
   });
 
-  /* -- chart -- */
-  Chart.register(ChartZoom);                     // activate the plugin
-  const ctx = document.getElementById('cumulative');
-  const colour = i => `hsl(${(i * 57) % 360} 70% 50%)`;
+  const latest = friends.map(f => totals[f].at(-1));
+  const minPts = Math.min(...latest);
+  const maxPts = Math.max(...latest);
 
+  /* ----- Chart.js ----- */
+  Chart.register(ChartZoom);
+  const ctx = document.getElementById('cumulative');
   const chart = new Chart(ctx, {
     type: 'line',
     data: {
       labels: dates,
-      datasets: friends.map((f, i) => ({
-        label: f,
-        data: totals[f],
-        borderColor: colour(i),
-        backgroundColor: `${colour(i)} / 0.15`,
-        tension: 0.25,
-        pointRadius: 4,
-        pointHoverRadius: 6
-      }))
+      datasets: friends.map((f, i) => {
+        const c = colourFor(latest[i], minPts, maxPts);
+        return {
+          label: f,
+          data: totals[f],
+          borderColor: c,
+          backgroundColor: c + ' / 0.25',
+          pointBackgroundColor: c,
+          tension: 0.25,
+          pointRadius: 5,
+          pointHoverRadius: 7
+        };
+      })
     },
     options: {
       responsive: true,
-      maintainAspectRatio: false,   // CSS controls height
+      maintainAspectRatio: false,
       plugins: {
-        legend:   { position: 'bottom', labels: { usePointStyle: true, boxWidth: 8 } },
-        tooltip:  { callbacks: { label: c => `${c.dataset.label}: ${c.parsed.y} pts` } },
+        legend: { position: 'bottom', labels: { usePointStyle: true, boxWidth: 8 } },
+        tooltip:{ callbacks:{ label:c=>`${c.dataset.label}: ${c.parsed.y} pts` } },
         zoom: {
-          limits: { y: { min: 0 } },
-          pan:   { enabled: true, mode: 'xy', modifierKey: 'ctrl' },
-          zoom:  { wheel: { enabled: true }, pinch: { enabled: true }, mode: 'xy' }
+          pan:  { enabled: true, mode: 'xy' },       // free-drag
+          zoom: { wheel:{enabled:true}, pinch:{enabled:true}, mode:'xy' }
         }
       },
       scales: {
-        x: { title: { display: true, text: 'Match date' } },
-        y: { title: { display: true, text: 'Total points' }, beginAtZero: true }
+        x:{ title:{ display:true, text:'Match date' } },
+        y:{ title:{ display:true, text:'Total points' }, beginAtZero:true }
       }
     }
   });
-
-  /* reset-zoom button */
   document.getElementById('resetZoom').onclick = () => chart.resetZoom();
+
+  /* ----- Leaderboard table ----- */
+  const tableData = friends.map((f, i) => ({
+    friend: f,
+    pts: latest[i],
+    color: colourFor(latest[i], minPts, maxPts)
+  })).sort((a,b)=>b.pts - a.pts);   // highest first
+
+  const table = new DataTable('#leaderboard', {
+    data: tableData,
+    columns: [
+      { title:'Friend', data:'friend',
+        render:data=>`<span style="font-weight:600">${data}</span>` },
+      { title:'Points', data:'pts',
+        render:(d,_,row)=>`<span style="color:${row.color};font-weight:600">${d}</span>` }
+    ],
+    paging:false,
+    searching:false,
+    info:false,
+    order:[[1,'desc']]
+  });
 })();

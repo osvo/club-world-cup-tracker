@@ -14,13 +14,13 @@
   <link rel="stylesheet" href="assets/tracker.css" />
 
   <!-- ───────── JS libs (deferred & in order) ───────── -->
-  <!-- Papa Parse from CDN (v5.4.1) -->
   <script defer src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
-  <!-- Chart.js core -->
   <script defer src="https://cdn.jsdelivr.net/npm/chart.js@4.5.0/dist/chart.umd.min.js"></script>
-  <!-- Chart.js zoom/pan plugin -->
   <script defer src="https://cdn.jsdelivr.net/npm/chartjs-plugin-zoom@2.0.1/dist/chartjs-plugin-zoom.min.js"></script>
-  <!-- Your logic (must come last) -->
+  <link  rel="stylesheet" href="https://cdn.datatables.net/2/dt.dataTables.min.css">
+  <script defer src="https://cdn.datatables.net/2/dt.dataTables.min.js"></script>
+
+  <!-- Your logic -->
   <script defer src="assets/tracker.js"></script>
 </head>
 
@@ -30,16 +30,19 @@
     <p class="subtitle">Live cumulative points</p>
   </header>
 
-  <main>
-
+  <main class="dashboard">
+    <!-- chart -->
     <div class="chart-wrap">
       <canvas id="cumulative"></canvas>
+      <div id="toolbar">
+        <button id="resetZoom">Reset zoom</button>
+      </div>
     </div>
 
-    <div id="toolbar">
-      <button id="resetZoom">Reset zoom</button>
+    <!-- table -->
+    <div class="table-wrap">
+      <table id="leaderboard" class="display"></table>
     </div>
-
   </main>
 
   <footer>
