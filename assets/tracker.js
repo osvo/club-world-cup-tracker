@@ -54,11 +54,11 @@ const colPts = n => `hsl(${huePts[n] ?? 0} 75% 55%)`;
     </tbody>`;
   tablePane.insertBefore(summaryTable, tablePane.firstChild);
 
-  // Categorical palette for chart
+  // Generate categorical palette for chart
   const palette = friends.map((_, i) => `hsl(${Math.round(i * 360 / friends.length)} 70% 50%)`);
 
   /* ==== chart (pan+zoom) ========================================== */
-  // Register zoom plugin
+  // Ensure plugin is registered
   Chart.register(ChartZoom);
 
   const ctx = document.getElementById('cumulative');
@@ -88,11 +88,15 @@ const colPts = n => `hsl(${huePts[n] ?? 0} 75% 55%)`;
           pan: {
             enabled: true,
             mode: 'xy',
-            threshold: 0,
-            onPanStart: () => ctx.style.cursor = 'grabbing',
-            onPanComplete: () => ctx.style.cursor = 'grab'
+            modifierKey: null,
+            threshold: 0
           },
-          zoom: { wheel: { enabled: true }, pinch: { enabled: true }, mode: 'xy' }
+          zoom: {
+            wheel: { enabled: true },
+            pinch: { enabled: true },
+            drag: { enabled: false },
+            mode: 'xy'
+          }
         }
       },
       scales: {
@@ -102,12 +106,16 @@ const colPts = n => `hsl(${huePts[n] ?? 0} 75% 55%)`;
     }
   });
 
+  // panning cursor events
+  chart.options.plugins.zoom.pan.onPanStart = () => ctx.style.cursor = 'grabbing';
+  chart.options.plugins.zoom.pan.onPanComplete = () => ctx.style.cursor = 'grab';
+
   // Reset zoom button
   document.getElementById('resetZoom').onclick = () => chart.resetZoom();
 
   /* ==== legend ===================================================== */
   document.getElementById('pts-legend').innerHTML =
-    [0,2,3,5].map(n => `<span class="legend-box" style="background:${colPts(n)}"></span>${n}`).join(' ');
+    [0,2,3,5].map(n => `<span class=\"legend-box\" style=\"background:${colPts(n)}\"></span>${n}`).join(' ');
 
   /* ==== DataTable ================================================== */
   const tableData = data.map(r => {
@@ -121,15 +129,7 @@ const colPts = n => `hsl(${huePts[n] ?? 0} 75% 55%)`;
     { title: 'Score', data: 'actual' },
     ...friends.map(f => ({ title: f, data: f, createdCell: (td, _, row) => { td.style.background = colPts(row[`${f}_pts`]); } }))
   ];
-  new DataTable('#leaderboard', {
-    data: tableData,
-    columns,
-    order: [[0, 'asc']],
-    paging: false,
-    scrollY: '60vh',
-    scrollX: true,
-    scrollCollapse: true
-  });
+  new DataTable('#leaderboard', { data: tableData, columns, order: [[0, 'asc']], paging: false, scrollY: '60vh', scrollX: true, scrollCollapse: true });
 
   /* ==== splitter =================================================== */
   const drag = document.getElementById('dragBar');
