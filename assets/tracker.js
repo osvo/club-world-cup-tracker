@@ -11,8 +11,8 @@ const pts = (p, a) => {
   return 0;
 };
 
-// palette for point scores: 0=red,2=blue,3=orange,5=green
-const huePts = { 0: 0, 2: 210, 3: 30, 5: 120 };
+// palette for point scores reverted to original: 0=red,2=amber,3=lime,5=green-blue
+const huePts = { 0: 0, 2: 25, 3: 55, 5: 130 };
 const colPts = n => `hsl(${huePts[n] ?? 0} 75% 55%)`;
 
 /* ==== main ========================================================= */
@@ -23,7 +23,7 @@ const colPts = n => `hsl(${huePts[n] ?? 0} 75% 55%)`;
   const friends = Object.keys(data[0]).slice(4);
   if (!friends.length) return;
 
-  // categorical palette: unique color per friend
+  // categorical palette: unique color per friend (for chart only)
   const palette = friends.map((_, i) => {
     const hue = Math.round(i * 360 / friends.length);
     return `hsl(${hue} 70% 50%)`;
@@ -40,7 +40,25 @@ const colPts = n => `hsl(${huePts[n] ?? 0} 75% 55%)`;
   dates.forEach((d, i) => friends.forEach(f => {
     totals[f][i] = (totals[f][i - 1] || 0) + data.filter(r => r.date === d).reduce((s, r) => s + r[`${f}_pts`], 0);
   }));
-  const last = friends.map(f => totals[f].at(-1)), min = Math.min(...last), max = Math.max(...last);
+  const last = friends.map(f => totals[f].at(-1));
+
+  /* ==== standings summary ========================================= */
+  // build a small table with rankings and points
+  const standings = friends.map((f, i) => ({ name: f, points: last[i] }))
+    .sort((a, b) => b.points - a.points);
+  const tablePane = document.getElementById('tablePane');
+  const summaryTable = document.createElement('table');
+  summaryTable.id = 'standings-summary';
+  summaryTable.innerHTML = `
+    <thead>
+      <tr><th>Pos</th><th>Jugador</th><th>Puntos</th></tr>
+    </thead>
+    <tbody>
+      ${standings.map((s, idx) => `<tr><td>${idx + 1}</td><td>${s.name}</td><td>${s.points}</td></tr>`).join('')}
+    </tbody>
+  `;
+  // insert summary above legend
+  tablePane.insertBefore(summaryTable, tablePane.firstChild);
 
   /* ==== chart (pan+zoom) ========================================== */
   Chart.register(ChartZoom);
@@ -83,7 +101,9 @@ const colPts = n => `hsl(${huePts[n] ?? 0} 75% 55%)`;
 
   /* ==== legend ===================================================== */
   const legend = document.getElementById('pts-legend');
-  legend.innerHTML = [0, 2, 3, 5].map(n => `<span class="legend-box" style="background:${colPts(n)}"></span>${n}`).join(' ');
+  legend.innerHTML = [0, 2, 3, 5]
+    .map(n => `<span class="legend-box" style="background:${colPts(n)}"></span>${n}`)
+    .join(' ');
 
   /* ==== DataTable ================================================== */
   const tableData = data.map(r => {
@@ -96,7 +116,7 @@ const colPts = n => `hsl(${huePts[n] ?? 0} 75% 55%)`;
     { title: 'Date', data: 'date' },
     { title: 'Match', data: 'match', className: 'match-cell' },
     { title: 'Score', data: 'actual' },
-    ...friends.map((f) => ({
+    ...friends.map(f => ({
       title: f,
       data: f,
       createdCell: (td, _, row) => { const p = row[`${f}_pts`]; td.style.background = colPts(p); }
@@ -114,7 +134,7 @@ const colPts = n => `hsl(${huePts[n] ?? 0} 75% 55%)`;
   });
 
   /* ==== splitter =================================================== */
-  const drag = document.getElementById('dragBar'), chartPane = document.getElementById('chartPane'), tablePane = document.getElementById('tablePane');
+  const drag = document.getElementById('dragBar'), chartPane = document.getElementById('chartPane');
   let startX, startLeft;
   drag.addEventListener('mousedown', e => {
     startX = e.clientX; startLeft = chartPane.getBoundingClientRect().width;
