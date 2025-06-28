@@ -57,7 +57,7 @@ const colPts = n => `hsl(${huePts[n] ?? 0} 75% 55%)`;
   // Generate categorical palette for chart
   const palette = friends.map((_, i) => `hsl(${Math.round(i * 360 / friends.length)} 70% 50%)`);
 
-  /* ==== chart (pan+zoom via plugin) ================================= */
+  /* ==== chart (wheel/pinch zoom) =================================== */
   Chart.register(ChartZoom);
   const ctx = document.getElementById('cumulative');
   ctx.style.cursor = 'grab';
@@ -83,8 +83,8 @@ const colPts = n => `hsl(${huePts[n] ?? 0} 75% 55%)`;
       plugins: {
         legend: { position: 'bottom', labels: { usePointStyle: true, boxWidth: 8 } },
         zoom: {
-          pan: { enabled: true, mode: 'xy', modifierKey: null },
-          zoom: { wheel: { enabled: true }, pinch: { enabled: true }, mode: 'xy' }
+          pan: { enabled: false },
+          zoom: { wheel: { enabled: true }, pinch: { enabled: true }, mode: 'x' }
         }
       },
       scales: {
@@ -93,6 +93,27 @@ const colPts = n => `hsl(${huePts[n] ?? 0} 75% 55%)`;
       }
     }
   });
+
+  /* ==== manual pan via plugin method =============================== */
+  let isPanning = false;
+  let lastX = 0;
+  function endPan() {
+    isPanning = false;
+    ctx.style.cursor = 'grab';
+  }
+  ctx.addEventListener('mousedown', e => {
+    isPanning = true;
+    lastX = e.clientX;
+    ctx.style.cursor = 'grabbing';
+  });
+  ctx.addEventListener('mousemove', e => {
+    if (!isPanning) return;
+    const deltaX = e.clientX - lastX;
+    chart.pan({ x: deltaX, y: 0 }, { duration: 0 });
+    lastX = e.clientX;
+  });
+  ctx.addEventListener('mouseup', endPan);
+  ctx.addEventListener('mouseleave', endPan);
 
   // Reset zoom button
   document.getElementById('resetZoom').onclick = () => chart.resetZoom();
@@ -111,21 +132,9 @@ const colPts = n => `hsl(${huePts[n] ?? 0} 75% 55%)`;
     { title: 'Date', data: 'date' },
     { title: 'Match', data: 'match', className: 'match-cell' },
     { title: 'Score', data: 'actual' },
-    ...friends.map(f => ({
-      title: f,
-      data: f,
-      createdCell: (td, _, row) => { td.style.background = colPts(row[`${f}_pts`]); }
-    }))
+    ...friends.map(f => ({ title: f, data: f, createdCell: (td, _, row) => { td.style.background = colPts(row[`${f}_pts`]); } }))
   ];
-  new DataTable('#leaderboard', {
-    data: tableData,
-    columns,
-    order: [[0, 'asc']],
-    paging: false,
-    scrollY: '60vh',
-    scrollX: true,
-    scrollCollapse: true
-  });
+  new DataTable('#leaderboard', { data: tableData, columns, order: [[0,'asc']], paging: false, scrollY: '60vh', scrollX: true, scrollCollapse: true });
 
   /* ==== splitter =================================================== */
   const drag = document.getElementById('dragBar');
