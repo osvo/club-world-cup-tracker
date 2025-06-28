@@ -1,5 +1,6 @@
 /* ==== helpers ====================================================== */
-// points
+// points calculation
+typescript
 const pts = (p, a) => {
   if (!p) return 0;
   const [ph, pa] = p.split('-').map(Number);
@@ -11,156 +12,94 @@ const pts = (p, a) => {
   return 0;
 };
 
-// palette for point scores reverted to original: 0=red,2=amber,3=lime,5=green-blue
+// original palette for table cells (0/2/3/5)
 const huePts = { 0: 0, 2: 25, 3: 55, 5: 130 };
 const colPts = n => `hsl(${huePts[n] ?? 0} 75% 55%)`;
 
 /* ==== main ========================================================= */
 (async () => {
-  // CSV
-  const csv = await fetch('data.csv?nocache=' + Date.now()).then(r => r.text());
+  // Load CSV\ n  const csv = await (await fetch('data.csv?nocache=' + Date.now())).text();
   const { data } = Papa.parse(csv, { header: true, skipEmptyLines: true });
   const friends = Object.keys(data[0]).slice(4);
   if (!friends.length) return;
 
-  // categorical palette: unique color per friend (for chart only)
-  const palette = friends.map((_, i) => {
-    const hue = Math.round(i * 360 / friends.length);
-    return `hsl(${hue} 70% 50%)`;
-  });
-
+  // Compute match label and points per friend
   data.forEach(r => {
     r.match = `${r.local} vs ${r.visitor}`.slice(0, 24);
-    friends.forEach(f => {
-      r[`${f}_pts`] = pts(r[f], r.score);
-    });
+    friends.forEach(f => r[`${f}_pts`] = pts(r[f], r.score));
   });
 
-  // cumulative totals
+  // Cumulative totals
   const dates = [...new Set(data.map(r => r.date))].sort();
   const totals = Object.fromEntries(friends.map(f => [f, Array(dates.length).fill(0)]));
   dates.forEach((d, i) => friends.forEach(f => {
-    totals[f][i] = (totals[f][i - 1] || 0) + data
-      .filter(r => r.date === d)
-      .reduce((s, r) => s + r[`${f}_pts`], 0);
+    totals[f][i] = (totals[f][i - 1] || 0) + data.filter(r => r.date === d).reduce((s, r) => s + r[`${f}_pts`], 0);
   }));
   const last = friends.map(f => totals[f].at(-1));
 
-  /* ==== standings summary ========================================= */
-  const standings = friends.map((f, i) => ({ name: f, points: last[i] }))
-    .sort((a, b) => b.points - a.points);
-  const tablePane = document.getElementById('tablePane');
-  const summaryTable = document.createElement('table');
-  summaryTable.id = 'standings-summary';
-  summaryTable.innerHTML = `
-    <thead>
-      <tr><th>Pos</th><th>Jugador</th><th>Puntos</th></tr>
-    </thead>
-    <tbody>
-      ${standings.map((s, idx) => `<tr><td>${idx + 1}</td><td>${s.name}</td><td>${s.points}</td></tr>`).join('')}
-    </tbody>
-  `;
-  tablePane.insertBefore(summaryTable, tablePane.firstChild);
+  // Insert standings summary table above legend
+  const legend = document.getElementById('pts-legend');
+  const standingsSummary = document.createElement('table');
+  standingsSummary.id = 'standings-summary';
+  const standings = friends.map((f, i) => ({ name: f, points: last[i] })).sort((a, b) => b.points - a.points);
+  const thead = `<thead><tr><th>Pos</th><th>Jugador</th><th>Puntos</th></tr></thead>`;
+  const tbody = `<tbody>${standings.map((e, idx) => `<tr><td>${idx+1}</td><td>${e.name}</td><td>${e.points}</td></tr>`).join('')}</tbody>`;
+  standingsSummary.innerHTML = thead + tbody;
+  legend.parentNode.insertBefore(standingsSummary, legend);
 
-  /* ==== chart (pan+zoom) ========================================== */
+  // Generate categorical palette for chart
+  const palette = friends.map((_, i) => `hsl(${Math.round(i * 360 / friends.length)} 70% 50%)`);
+
+  // Chart (pan+zoom)
   const ctx = document.getElementById('cumulative');
+  // Register plugin if not auto-registered
+  Chart.register(ChartZoom);
   const chart = new Chart(ctx, {
     type: 'line',
-    data: {
-      labels: dates,
-      datasets: friends.map((f, i) => {
-        const color = palette[i];
-        return {
-          label: f,
-          data: totals[f],
-          borderColor: color,
-          backgroundColor: color.replace(/hsl\(([^)]+)\)/, 'hsla($1,0.2)'),
-          pointBackgroundColor: color,
-          tension: .25,
-          pointRadius: 4,
-          pointHoverRadius: 6
-        };
-      })
-    },
+    data: { labels: dates, datasets: friends.map((f, i) => {
+      const color = palette[i];
+      return {
+        label: f,
+        data: totals[f],
+        borderColor: color,
+        backgroundColor: color.replace(/hsl\(([^)]+)\)/, 'hsla($1,0.2)'),
+        pointBackgroundColor: color,
+        tension: .25,
+        pointRadius: 4,
+        pointHoverRadius: 6
+      };
+    }) },
     options: {
       responsive: true,
       maintainAspectRatio: false,
       plugins: {
-        legend: {
-          position: 'bottom', labels: { usePointStyle: true, boxWidth: 8 }
-        },
+        legend: { position: 'bottom', labels: { usePointStyle: true, boxWidth: 8 } },
         zoom: {
-          pan: {
-            enabled: true,
-            mode: 'xy',
-            onPanStart: () => ctx.style.cursor = 'grabbing',
-            onPanComplete: () => ctx.style.cursor = 'grab'
-          },
-          zoom: {
-            wheel: { enabled: true },
-            pinch: { enabled: true },
-            mode: 'xy'
-          }
+          pan: { enabled: true, mode: 'xy', threshold: 0 },
+          zoom: { wheel: { enabled: true }, pinch: { enabled: true }, mode: 'xy', drag: false }
         }
       },
-      scales: {
-        x: { title: { display: true, text: 'Match date' } },
-        y: { beginAtZero: true, title: { display: true, text: 'Total points' } }
-      }
+      scales: { x: { title: { display: true, text: 'Match date' } }, y: { beginAtZero: true, title: { display: true, text: 'Total points' } } }
     }
   });
 
+  // Set grab cursor only when panning
   ctx.style.cursor = 'grab';
+  chart.canvas.addEventListener('mousedown', () => ctx.style.cursor = 'grabbing');
+  document.addEventListener('mouseup', () => ctx.style.cursor = 'grab');
+
   document.getElementById('resetZoom').onclick = () => chart.resetZoom();
 
-  /* ==== legend ===================================================== */
-  document.getElementById('pts-legend').innerHTML =
-    [0, 2, 3, 5].map(n => `<span class="legend-box" style="background:${colPts(n)}"></span>${n}`).join(' ');
+  // Legend for pts values
+  legend.innerHTML = [0,2,3,5].map(n=>`<span class="legend-box" style="background:${colPts(n)}"></span>${n}`).join('');
 
-  /* ==== DataTable ================================================== */
-  const tableData = data.map(r => {
-    const row = { date: r.date, match: r.match, actual: r.score };
-    friends.forEach(f => { row[f] = r[f] || ''; row[`${f}_pts`] = r[`${f}_pts`]; });
-    return row;
-  });
-  const columns = [
-    { title: 'Date', data: 'date' },
-    { title: 'Match', data: 'match', className: 'match-cell' },
-    { title: 'Score', data: 'actual' },
-    ...friends.map(f => ({
-      title: f,
-      data: f,
-      createdCell: (td, _, row) => { const p = row[`${f}_pts`]; td.style.background = colPts(p); }
-    }))
-  ];
-  new DataTable('#leaderboard', {
-    data: tableData,
-    columns,
-    order: [[0, 'asc']],
-    paging: false,
-    scrollY: '60vh',
-    scrollX: true,
-    scrollCollapse: true
-  });
+  // DataTable
+  const tableData = data.map(r=>{ const row={date:r.date,match:r.match,actual:r.score}; friends.forEach(f=>{row[f]=r[f]||'';row[`${f}_pts`]=r[`${f}_pts`]}); return row; });
+  const columns = [ {title:'Date',data:'date'},{title:'Match',data:'match',className:'match-cell'},{title:'Score',data:'actual'},...friends.map(f=>({ title:f,data:f,createdCell:(td,_,row)=>{td.style.background=colPts(row[`${f}_pts`]);}}))];
+  new DataTable('#leaderboard',{data:tableData,columns,order:[[0,'asc']],paging:false,scrollY:'60vh',scrollX:true,scrollCollapse:true});
 
-  /* ==== splitter =================================================== */
-  const drag = document.getElementById('dragBar');
-  const chartPane = document.getElementById('chartPane');
+  // Splitter
+  const drag = document.getElementById('dragBar'), chartPane = document.getElementById('chartPane');
   let startX, startLeft;
-  drag.addEventListener('mousedown', e => {
-    startX = e.clientX;
-    startLeft = chartPane.getBoundingClientRect().width;
-    document.body.style.userSelect = 'none';
-    const move = e2 => {
-      const dx = e2.clientX - startX;
-      chartPane.style.flexBasis = `${startLeft + dx}px`;
-    };
-    const up = () => {
-      document.removeEventListener('mousemove', move);
-      document.removeEventListener('mouseup', up);
-      document.body.style.userSelect = 'auto';
-    };
-    document.addEventListener('mousemove', move);
-    document.addEventListener('mouseup', up);
-  });
+  drag.addEventListener('mousedown', e=>{startX=e.clientX;startLeft=chartPane.getBoundingClientRect().width;document.body.style.userSelect='none';const move=e2=>chartPane.style.flexBasis=`${startLeft+(e2.clientX-startX)}px`;const up=()=>{document.removeEventListener('mousemove',move);document.removeEventListener('mouseup',up);document.body.style.userSelect='auto';};document.addEventListener('mousemove',move);document.addEventListener('mouseup',up);});
 })();
