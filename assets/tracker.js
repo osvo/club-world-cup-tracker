@@ -24,13 +24,13 @@ const colPts = n => `hsl(${huePts[n] ?? 0} 75% 55%)`;
   const friends = Object.keys(data[0]).slice(4);
   if (!friends.length) return;
 
-  // Compute labels and points
+  // Compute match labels and points
   data.forEach(r => {
     r.match = `${r.local} vs ${r.visitor}`.slice(0, 24);
     friends.forEach(f => r[`${f}_pts`] = pts(r[f], r.score));
   });
 
-  // Calculate cumulative totals
+  // Calculate cumulative totals per date
   const dates = [...new Set(data.map(r => r.date))].sort();
   const totals = Object.fromEntries(friends.map(f => [f, Array(dates.length).fill(0)]));
   dates.forEach((d, i) => friends.forEach(f => {
@@ -54,11 +54,16 @@ const colPts = n => `hsl(${huePts[n] ?? 0} 75% 55%)`;
     </tbody>`;
   tablePane.insertBefore(summaryTable, tablePane.firstChild);
 
-  // Generate categorical palette for chart
+  // Categorical palette for chart
   const palette = friends.map((_, i) => `hsl(${Math.round(i * 360 / friends.length)} 70% 50%)`);
 
   /* ==== chart (pan+zoom) ========================================== */
+  // Register zoom plugin
+  Chart.register(ChartZoom);
+
   const ctx = document.getElementById('cumulative');
+  ctx.style.cursor = 'grab';
+
   const chart = new Chart(ctx, {
     type: 'line',
     data: {
@@ -80,7 +85,13 @@ const colPts = n => `hsl(${huePts[n] ?? 0} 75% 55%)`;
       plugins: {
         legend: { position: 'bottom', labels: { usePointStyle: true, boxWidth: 8 } },
         zoom: {
-          pan: { enabled: true, mode: 'xy' },
+          pan: {
+            enabled: true,
+            mode: 'xy',
+            threshold: 0,
+            onPanStart: () => ctx.style.cursor = 'grabbing',
+            onPanComplete: () => ctx.style.cursor = 'grab'
+          },
           zoom: { wheel: { enabled: true }, pinch: { enabled: true }, mode: 'xy' }
         }
       },
@@ -90,11 +101,6 @@ const colPts = n => `hsl(${huePts[n] ?? 0} 75% 55%)`;
       }
     }
   });
-
-  // Set grab cursor behavior
-  chart.options.plugins.zoom.pan.onPanStart = () => ctx.style.cursor = 'grabbing';
-  chart.options.plugins.zoom.pan.onPanComplete = () => ctx.style.cursor = 'grab';
-  ctx.style.cursor = 'grab';
 
   // Reset zoom button
   document.getElementById('resetZoom').onclick = () => chart.resetZoom();
@@ -113,11 +119,7 @@ const colPts = n => `hsl(${huePts[n] ?? 0} 75% 55%)`;
     { title: 'Date', data: 'date' },
     { title: 'Match', data: 'match', className: 'match-cell' },
     { title: 'Score', data: 'actual' },
-    ...friends.map(f => ({
-      title: f,
-      data: f,
-      createdCell: (td, _, row) => { td.style.background = colPts(row[`${f}_pts`]); }
-    }))
+    ...friends.map(f => ({ title: f, data: f, createdCell: (td, _, row) => { td.style.background = colPts(row[`${f}_pts`]); } }))
   ];
   new DataTable('#leaderboard', {
     data: tableData,
