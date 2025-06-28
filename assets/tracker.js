@@ -33,10 +33,13 @@ const colPts = n => `hsl(${huePts[n] ?? 0} 75% 55%)`;
   // Calculate cumulative totals per date
   const dates = [...new Set(data.map(r => r.date))].sort();
   const totals = Object.fromEntries(friends.map(f => [f, Array(dates.length).fill(0)]));
-  dates.forEach((d, i) => friends.forEach(f => {
-    const sumPts = data.filter(r => r.date === d).reduce((sum, r) => sum + r[`${f}_pts`], 0);
-    totals[f][i] = (totals[f][i - 1] || 0) + sumPts;
-  }));
+  dates.forEach((d, i) => {
+    friends.forEach(f => {
+      const sumPts = data.filter(r => r.date === d)
+                          .reduce((sum, r) => sum + r[`${f}_pts`], 0);
+      totals[f][i] = (totals[f][i - 1] || 0) + sumPts;
+    });
+  });
   const last = friends.map(f => totals[f].at(-1));
 
   // Insert standings summary table
@@ -57,8 +60,8 @@ const colPts = n => `hsl(${huePts[n] ?? 0} 75% 55%)`;
   // Generate categorical palette for chart
   const palette = friends.map((_, i) => `hsl(${Math.round(i * 360 / friends.length)} 70% 50%)`);
 
-  /* ==== chart (pan+zoom) ========================================== */
-  // Ensure plugin is registered
+  /* ==== chart (zoom only) ========================================= */
+  // Register zoom plugin for wheel/pinch
   Chart.register(ChartZoom);
 
   const ctx = document.getElementById('cumulative');
@@ -85,18 +88,8 @@ const colPts = n => `hsl(${huePts[n] ?? 0} 75% 55%)`;
       plugins: {
         legend: { position: 'bottom', labels: { usePointStyle: true, boxWidth: 8 } },
         zoom: {
-          pan: {
-            enabled: true,
-            mode: 'xy',
-            modifierKey: null,
-            threshold: 0
-          },
-          zoom: {
-            wheel: { enabled: true },
-            pinch: { enabled: true },
-            drag: { enabled: false },
-            mode: 'xy'
-          }
+          pan: { enabled: false },  // disable plugin pan
+          zoom: { wheel: { enabled: true }, pinch: { enabled: true }, mode: 'xy' }
         }
       },
       scales: {
@@ -106,16 +99,43 @@ const colPts = n => `hsl(${huePts[n] ?? 0} 75% 55%)`;
     }
   });
 
-  // panning cursor events
-  chart.options.plugins.zoom.pan.onPanStart = () => ctx.style.cursor = 'grabbing';
-  chart.options.plugins.zoom.pan.onPanComplete = () => ctx.style.cursor = 'grab';
+  /* ==== manual panning ============================================ */
+  let isPanning = false;
+  let startX = 0;
+  let origMin, origMax;
+  ctx.addEventListener('mousedown', e => {
+    isPanning = true;
+    startX = e.offsetX;
+    const scale = chart.scales.x;
+    origMin = scale.min;
+    origMax = scale.max;
+    ctx.style.cursor = 'grabbing';
+  });
+  ctx.addEventListener('mousemove', e => {
+    if (!isPanning) return;
+    const scale = chart.scales.x;
+    const deltaPx = e.offsetX - startX;
+    const deltaValue = -deltaPx / scale.width * (origMax - origMin);
+    chart.options.scales.x.min = origMin + deltaValue;
+    chart.options.scales.x.max = origMax + deltaValue;
+    chart.update('none');
+  });
+  document.addEventListener('mouseup', () => {
+    if (!isPanning) return;
+    isPanning = false;
+    ctx.style.cursor = 'grab';
+  });
 
   // Reset zoom button
-  document.getElementById('resetZoom').onclick = () => chart.resetZoom();
+  document.getElementById('resetZoom').onclick = () => {
+    delete chart.options.scales.x.min;
+    delete chart.options.scales.x.max;
+    chart.update();
+  };
 
   /* ==== legend ===================================================== */
   document.getElementById('pts-legend').innerHTML =
-    [0,2,3,5].map(n => `<span class=\"legend-box\" style=\"background:${colPts(n)}\"></span>${n}`).join(' ');
+    [0,2,3,5].map(n => `<span class="legend-box" style="background:${colPts(n)}"></span>${n}`).join(' ');
 
   /* ==== DataTable ================================================== */
   const tableData = data.map(r => {
@@ -127,19 +147,31 @@ const colPts = n => `hsl(${huePts[n] ?? 0} 75% 55%)`;
     { title: 'Date', data: 'date' },
     { title: 'Match', data: 'match', className: 'match-cell' },
     { title: 'Score', data: 'actual' },
-    ...friends.map(f => ({ title: f, data: f, createdCell: (td, _, row) => { td.style.background = colPts(row[`${f}_pts`]); } }))
+    ...friends.map(f => ({
+      title: f,
+      data: f,
+      createdCell: (td, _, row) => { td.style.background = colPts(row[`${f}_pts`]); }
+    }))
   ];
-  new DataTable('#leaderboard', { data: tableData, columns, order: [[0, 'asc']], paging: false, scrollY: '60vh', scrollX: true, scrollCollapse: true });
+  new DataTable('#leaderboard', {
+    data: tableData,
+    columns,
+    order: [[0, 'asc']],
+    paging: false,
+    scrollY: '60vh',
+    scrollX: true,
+    scrollCollapse: true
+  });
 
   /* ==== splitter =================================================== */
   const drag = document.getElementById('dragBar');
   const chartPane = document.getElementById('chartPane');
-  let startX, startLeft;
+  let sX, sLeft;
   drag.addEventListener('mousedown', e => {
-    startX = e.clientX;
-    startLeft = chartPane.getBoundingClientRect().width;
+    sX = e.clientX;
+    sLeft = chartPane.getBoundingClientRect().width;
     document.body.style.userSelect = 'none';
-    const move = e2 => chartPane.style.flexBasis = `${startLeft + (e2.clientX - startX)}px`;
+    const move = e2 => chartPane.style.flexBasis = `${sLeft + (e2.clientX - sX)}px`;
     const up = () => { document.removeEventListener('mousemove', move); document.removeEventListener('mouseup', up); document.body.style.userSelect = 'auto'; };
     document.addEventListener('mousemove', move);
     document.addEventListener('mouseup', up);
