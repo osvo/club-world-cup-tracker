@@ -17,7 +17,7 @@ const colPts = n => `hsl(${huePts[n] ?? 0} 75% 55%)`;
 
 /* ==== main ========================================================= */
 (async () => {
-  // Load CSV and parse
+  // Load and parse CSV
   const resp = await fetch('data.csv?nocache=' + Date.now());
   const csv = await resp.text();
   const { data } = Papa.parse(csv, { header: true, skipEmptyLines: true });
@@ -30,36 +30,34 @@ const colPts = n => `hsl(${huePts[n] ?? 0} 75% 55%)`;
     friends.forEach(f => r[`${f}_pts`] = pts(r[f], r.score));
   });
 
-  // Totals per date
+  // Calculate cumulative totals
   const dates = [...new Set(data.map(r => r.date))].sort();
   const totals = Object.fromEntries(friends.map(f => [f, Array(dates.length).fill(0)]));
   dates.forEach((d, i) => friends.forEach(f => {
-    metrics = data.filter(r => r.date === d).reduce((s, r) => s + r[`${f}_pts`], 0);
-    totals[f][i] = (totals[f][i - 1] || 0) + metrics;
+    const sumPts = data.filter(r => r.date === d).reduce((sum, r) => sum + r[`${f}_pts`], 0);
+    totals[f][i] = (totals[f][i - 1] || 0) + sumPts;
   }));
-
-  // Build standings summary
   const last = friends.map(f => totals[f].at(-1));
-  const standings = friends.map((f, i) => ({ name: f, points: last[i] }))
-    .sort((a, b) => b.points - a.points);
+
+  // Insert standings summary table
   const tablePane = document.getElementById('tablePane');
   const summaryTable = document.createElement('table');
   summaryTable.id = 'standings-summary';
+  const standings = friends.map((f, i) => ({ name: f, points: last[i] }))
+    .sort((a, b) => b.points - a.points);
   summaryTable.innerHTML = `
     <thead>
       <tr><th>Pos</th><th>Jugador</th><th>Puntos</th></tr>
     </thead>
     <tbody>
       ${standings.map((s, idx) => `<tr><td>${idx+1}</td><td>${s.name}</td><td>${s.points}</td></tr>`).join('')}
-    </tbody>
-  `;
+    </tbody>`;
   tablePane.insertBefore(summaryTable, tablePane.firstChild);
 
-  // Categorical palette for chart
+  // Generate categorical palette for chart
   const palette = friends.map((_, i) => `hsl(${Math.round(i * 360 / friends.length)} 70% 50%)`);
 
   /* ==== chart (pan+zoom) ========================================== */
-  Chart.register(ChartZoom);
   const ctx = document.getElementById('cumulative');
   const chart = new Chart(ctx, {
     type: 'line',
@@ -93,16 +91,17 @@ const colPts = n => `hsl(${huePts[n] ?? 0} 75% 55%)`;
     }
   });
 
-  // Reset cursor on pan
+  // Set grab cursor behavior
   chart.options.plugins.zoom.pan.onPanStart = () => ctx.style.cursor = 'grabbing';
   chart.options.plugins.zoom.pan.onPanComplete = () => ctx.style.cursor = 'grab';
   ctx.style.cursor = 'grab';
 
+  // Reset zoom button
   document.getElementById('resetZoom').onclick = () => chart.resetZoom();
 
   /* ==== legend ===================================================== */
   document.getElementById('pts-legend').innerHTML =
-    [0,2,3,5].map(n => `<span class=\"legend-box\" style=\"background:${colPts(n)}\"></span>${n}`).join(' ');
+    [0,2,3,5].map(n => `<span class="legend-box" style="background:${colPts(n)}"></span>${n}`).join(' ');
 
   /* ==== DataTable ================================================== */
   const tableData = data.map(r => {
@@ -114,18 +113,33 @@ const colPts = n => `hsl(${huePts[n] ?? 0} 75% 55%)`;
     { title: 'Date', data: 'date' },
     { title: 'Match', data: 'match', className: 'match-cell' },
     { title: 'Score', data: 'actual' },
-    ...friends.map(f => ({ title: f, data: f, createdCell: (td,_,row) => { td.style.background = colPts(row[`${f}_pts`]); } }))
+    ...friends.map(f => ({
+      title: f,
+      data: f,
+      createdCell: (td, _, row) => { td.style.background = colPts(row[`${f}_pts`]); }
+    }))
   ];
-  new DataTable('#leaderboard', { data: tableData, columns, order: [[0,'asc']], paging: false, scrollY: '60vh', scrollX: true, scrollCollapse: true });
+  new DataTable('#leaderboard', {
+    data: tableData,
+    columns,
+    order: [[0, 'asc']],
+    paging: false,
+    scrollY: '60vh',
+    scrollX: true,
+    scrollCollapse: true
+  });
 
   /* ==== splitter =================================================== */
-  const drag = document.getElementById('dragBar'), chartPane = document.getElementById('chartPane');
+  const drag = document.getElementById('dragBar');
+  const chartPane = document.getElementById('chartPane');
   let startX, startLeft;
   drag.addEventListener('mousedown', e => {
-    startX = e.clientX; startLeft = chartPane.getBoundingClientRect().width;
+    startX = e.clientX;
+    startLeft = chartPane.getBoundingClientRect().width;
     document.body.style.userSelect = 'none';
     const move = e2 => chartPane.style.flexBasis = `${startLeft + (e2.clientX - startX)}px`;
     const up = () => { document.removeEventListener('mousemove', move); document.removeEventListener('mouseup', up); document.body.style.userSelect = 'auto'; };
-    document.addEventListener('mousemove', move); document.addEventListener('mouseup', up);
+    document.addEventListener('mousemove', move);
+    document.addEventListener('mouseup', up);
   });
 })();
