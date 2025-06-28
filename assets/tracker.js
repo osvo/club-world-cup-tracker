@@ -18,7 +18,7 @@ const colPts = n => `hsl(${huePts[n] ?? 0} 75% 55%)`;
 /* ==== main ========================================================= */
 (async () => {
   // CSV
-  const csv = await (await fetch('data.csv?nocache=' + Date.now())).text();
+  const csv = await fetch('data.csv?nocache=' + Date.now()).then(r => r.text());
   const { data } = Papa.parse(csv, { header: true, skipEmptyLines: true });
   const friends = Object.keys(data[0]).slice(4);
   if (!friends.length) return;
@@ -31,19 +31,22 @@ const colPts = n => `hsl(${huePts[n] ?? 0} 75% 55%)`;
 
   data.forEach(r => {
     r.match = `${r.local} vs ${r.visitor}`.slice(0, 24);
-    friends.forEach(f => r[`${f}_pts`] = pts(r[f], r.score));
+    friends.forEach(f => {
+      r[`${f}_pts`] = pts(r[f], r.score);
+    });
   });
 
   // cumulative totals
   const dates = [...new Set(data.map(r => r.date))].sort();
   const totals = Object.fromEntries(friends.map(f => [f, Array(dates.length).fill(0)]));
   dates.forEach((d, i) => friends.forEach(f => {
-    totals[f][i] = (totals[f][i - 1] || 0) + data.filter(r => r.date === d).reduce((s, r) => s + r[`${f}_pts`], 0);
+    totals[f][i] = (totals[f][i - 1] || 0) + data
+      .filter(r => r.date === d)
+      .reduce((s, r) => s + r[`${f}_pts`], 0);
   }));
   const last = friends.map(f => totals[f].at(-1));
 
   /* ==== standings summary ========================================= */
-  // build a small table with rankings and points
   const standings = friends.map((f, i) => ({ name: f, points: last[i] }))
     .sort((a, b) => b.points - a.points);
   const tablePane = document.getElementById('tablePane');
@@ -57,11 +60,9 @@ const colPts = n => `hsl(${huePts[n] ?? 0} 75% 55%)`;
       ${standings.map((s, idx) => `<tr><td>${idx + 1}</td><td>${s.name}</td><td>${s.points}</td></tr>`).join('')}
     </tbody>
   `;
-  // insert summary above legend
   tablePane.insertBefore(summaryTable, tablePane.firstChild);
 
   /* ==== chart (pan+zoom) ========================================== */
-  Chart.register(ChartZoom);
   const ctx = document.getElementById('cumulative');
   const chart = new Chart(ctx, {
     type: 'line',
@@ -82,12 +83,24 @@ const colPts = n => `hsl(${huePts[n] ?? 0} 75% 55%)`;
       })
     },
     options: {
-      responsive: true, maintainAspectRatio: false,
+      responsive: true,
+      maintainAspectRatio: false,
       plugins: {
-        legend: { position: 'bottom', labels: { usePointStyle: true, boxWidth: 8 } },
+        legend: {
+          position: 'bottom', labels: { usePointStyle: true, boxWidth: 8 }
+        },
         zoom: {
-          pan: { enabled: true, mode: 'xy', onPanStart: () => ctx.style.cursor = 'grabbing', onPanComplete: () => ctx.style.cursor = 'grab' },
-          zoom: { wheel: { enabled: true }, pinch: { enabled: true }, mode: 'xy' }
+          pan: {
+            enabled: true,
+            mode: 'xy',
+            onPanStart: () => ctx.style.cursor = 'grabbing',
+            onPanComplete: () => ctx.style.cursor = 'grab'
+          },
+          zoom: {
+            wheel: { enabled: true },
+            pinch: { enabled: true },
+            mode: 'xy'
+          }
         }
       },
       scales: {
@@ -96,14 +109,13 @@ const colPts = n => `hsl(${huePts[n] ?? 0} 75% 55%)`;
       }
     }
   });
+
   ctx.style.cursor = 'grab';
   document.getElementById('resetZoom').onclick = () => chart.resetZoom();
 
   /* ==== legend ===================================================== */
-  const legend = document.getElementById('pts-legend');
-  legend.innerHTML = [0, 2, 3, 5]
-    .map(n => `<span class="legend-box" style="background:${colPts(n)}"></span>${n}`)
-    .join(' ');
+  document.getElementById('pts-legend').innerHTML =
+    [0, 2, 3, 5].map(n => `<span class="legend-box" style="background:${colPts(n)}"></span>${n}`).join(' ');
 
   /* ==== DataTable ================================================== */
   const tableData = data.map(r => {
@@ -111,7 +123,6 @@ const colPts = n => `hsl(${huePts[n] ?? 0} 75% 55%)`;
     friends.forEach(f => { row[f] = r[f] || ''; row[`${f}_pts`] = r[`${f}_pts`]; });
     return row;
   });
-
   const columns = [
     { title: 'Date', data: 'date' },
     { title: 'Match', data: 'match', className: 'match-cell' },
@@ -122,7 +133,6 @@ const colPts = n => `hsl(${huePts[n] ?? 0} 75% 55%)`;
       createdCell: (td, _, row) => { const p = row[`${f}_pts`]; td.style.background = colPts(p); }
     }))
   ];
-
   new DataTable('#leaderboard', {
     data: tableData,
     columns,
@@ -134,13 +144,23 @@ const colPts = n => `hsl(${huePts[n] ?? 0} 75% 55%)`;
   });
 
   /* ==== splitter =================================================== */
-  const drag = document.getElementById('dragBar'), chartPane = document.getElementById('chartPane');
+  const drag = document.getElementById('dragBar');
+  const chartPane = document.getElementById('chartPane');
   let startX, startLeft;
   drag.addEventListener('mousedown', e => {
-    startX = e.clientX; startLeft = chartPane.getBoundingClientRect().width;
+    startX = e.clientX;
+    startLeft = chartPane.getBoundingClientRect().width;
     document.body.style.userSelect = 'none';
-    const move = e2 => { const dx = e2.clientX - startX; chartPane.style.flexBasis = `${startLeft + dx}px`; };
-    const up = () => { document.removeEventListener('mousemove', move); document.removeEventListener('mouseup', up); document.body.style.userSelect = 'auto'; };
-    document.addEventListener('mousemove', move); document.addEventListener('mouseup', up);
+    const move = e2 => {
+      const dx = e2.clientX - startX;
+      chartPane.style.flexBasis = `${startLeft + dx}px`;
+    };
+    const up = () => {
+      document.removeEventListener('mousemove', move);
+      document.removeEventListener('mouseup', up);
+      document.body.style.userSelect = 'auto';
+    };
+    document.addEventListener('mousemove', move);
+    document.addEventListener('mouseup', up);
   });
 })();
