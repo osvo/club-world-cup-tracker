@@ -33,13 +33,10 @@ const colPts = n => `hsl(${huePts[n] ?? 0} 75% 55%)`;
   // Calculate cumulative totals per date
   const dates = [...new Set(data.map(r => r.date))].sort();
   const totals = Object.fromEntries(friends.map(f => [f, Array(dates.length).fill(0)]));
-  dates.forEach((d, i) => {
-    friends.forEach(f => {
-      const sumPts = data.filter(r => r.date === d)
-                          .reduce((sum, r) => sum + r[`${f}_pts`], 0);
-      totals[f][i] = (totals[f][i - 1] || 0) + sumPts;
-    });
-  });
+  dates.forEach((d, i) => friends.forEach(f => {
+    const sumPts = data.filter(r => r.date === d).reduce((sum, r) => sum + r[`${f}_pts`], 0);
+    totals[f][i] = (totals[f][i - 1] || 0) + sumPts;
+  }));
   const last = friends.map(f => totals[f].at(-1));
 
   // Insert standings summary table
@@ -60,10 +57,8 @@ const colPts = n => `hsl(${huePts[n] ?? 0} 75% 55%)`;
   // Generate categorical palette for chart
   const palette = friends.map((_, i) => `hsl(${Math.round(i * 360 / friends.length)} 70% 50%)`);
 
-  /* ==== chart (zoom only) ========================================= */
-  // Register zoom plugin for wheel/pinch
+  /* ==== chart (pan+zoom via plugin) ================================= */
   Chart.register(ChartZoom);
-
   const ctx = document.getElementById('cumulative');
   ctx.style.cursor = 'grab';
 
@@ -88,7 +83,7 @@ const colPts = n => `hsl(${huePts[n] ?? 0} 75% 55%)`;
       plugins: {
         legend: { position: 'bottom', labels: { usePointStyle: true, boxWidth: 8 } },
         zoom: {
-          pan: { enabled: false },  // disable plugin pan
+          pan: { enabled: true, mode: 'xy', modifierKey: null },
           zoom: { wheel: { enabled: true }, pinch: { enabled: true }, mode: 'xy' }
         }
       },
@@ -99,39 +94,8 @@ const colPts = n => `hsl(${huePts[n] ?? 0} 75% 55%)`;
     }
   });
 
-  /* ==== manual panning ============================================ */
-  let isPanning = false;
-  let startX = 0;
-  let origMin, origMax;
-  ctx.addEventListener('mousedown', e => {
-    isPanning = true;
-    startX = e.offsetX;
-    const scale = chart.scales.x;
-    origMin = scale.min;
-    origMax = scale.max;
-    ctx.style.cursor = 'grabbing';
-  });
-  ctx.addEventListener('mousemove', e => {
-    if (!isPanning) return;
-    const scale = chart.scales.x;
-    const deltaPx = e.offsetX - startX;
-    const deltaValue = -deltaPx / scale.width * (origMax - origMin);
-    chart.options.scales.x.min = origMin + deltaValue;
-    chart.options.scales.x.max = origMax + deltaValue;
-    chart.update('none');
-  });
-  document.addEventListener('mouseup', () => {
-    if (!isPanning) return;
-    isPanning = false;
-    ctx.style.cursor = 'grab';
-  });
-
   // Reset zoom button
-  document.getElementById('resetZoom').onclick = () => {
-    delete chart.options.scales.x.min;
-    delete chart.options.scales.x.max;
-    chart.update();
-  };
+  document.getElementById('resetZoom').onclick = () => chart.resetZoom();
 
   /* ==== legend ===================================================== */
   document.getElementById('pts-legend').innerHTML =
