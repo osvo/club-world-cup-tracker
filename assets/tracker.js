@@ -79,11 +79,37 @@ const colPts = n => `hsl(${huePts[n] ?? 0} 75% 55%)`;
     options: {
       responsive: true,
       maintainAspectRatio: false,
+      interaction: {
+        intersect: false,
+      },
       plugins: {
         legend: { position: 'bottom', labels: { usePointStyle: true, boxWidth: 8 } },
         zoom: {
-          pan: { enabled: true, mode: 'x' },
-          zoom: { wheel: { enabled: true }, pinch: { enabled: true }, mode: 'x' }
+          limits: {
+            x: {min: 'original', max: 'original'},
+            y: {min: 'original', max: 'original'}
+          },
+          pan: {
+            enabled: true,
+            mode: 'x',
+            modifierKey: null,
+            onPanComplete: function({chart}) {
+              console.log('Pan completed');
+            }
+          },
+          zoom: {
+            wheel: {
+              enabled: true,
+              speed: 0.1
+            },
+            pinch: {
+              enabled: true
+            },
+            mode: 'x',
+            onZoomComplete: function({chart}) {
+              console.log('Zoom completed');
+            }
+          }
         }
       },
       scales: {
@@ -97,6 +123,19 @@ const colPts = n => `hsl(${huePts[n] ?? 0} 75% 55%)`;
 
   // Reset zoom button
   document.getElementById('resetZoom').onclick = () => chart.resetZoom();
+
+  // Apply a slight initial zoom so panning is immediately available
+  setTimeout(() => {
+    if (dates.length > 3) {
+      chart.zoom(1.5);
+      console.log('Initial zoom applied - you can now pan the chart');
+    }
+  }, 100);
+
+  // Add some debugging for chart interactions
+  ctx.addEventListener('mousedown', () => console.log('Chart mousedown'));
+  ctx.addEventListener('mousemove', () => console.log('Chart mousemove'));
+  ctx.addEventListener('mouseup', () => console.log('Chart mouseup'));
 
   /* ==== legend ===================================================== */
   document.getElementById('pts-legend').innerHTML =
