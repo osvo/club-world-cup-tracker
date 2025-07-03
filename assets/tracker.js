@@ -60,7 +60,6 @@ const colPts = n => `hsl(${huePts[n] ?? 0} 75% 55%)`;
   /* ==== chart (wheel/pinch zoom) =================================== */
   Chart.register(ChartZoom);
   const ctx = document.getElementById('cumulative');
-  ctx.style.cursor = 'grab';
 
   const chart = new Chart(ctx, {
     type: 'line',
@@ -83,7 +82,7 @@ const colPts = n => `hsl(${huePts[n] ?? 0} 75% 55%)`;
       plugins: {
         legend: { position: 'bottom', labels: { usePointStyle: true, boxWidth: 8 } },
         zoom: {
-          pan: { enabled: false },
+          pan: { enabled: true, mode: 'x' },
           zoom: { wheel: { enabled: true }, pinch: { enabled: true }, mode: 'x' }
         }
       },
@@ -94,26 +93,7 @@ const colPts = n => `hsl(${huePts[n] ?? 0} 75% 55%)`;
     }
   });
 
-  /* ==== manual pan via plugin method =============================== */
-  let isPanning = false;
-  let lastX = 0;
-  function endPan() {
-    isPanning = false;
-    ctx.style.cursor = 'grab';
-  }
-  ctx.addEventListener('mousedown', e => {
-    isPanning = true;
-    lastX = e.clientX;
-    ctx.style.cursor = 'grabbing';
-  });
-  ctx.addEventListener('mousemove', e => {
-    if (!isPanning) return;
-    const deltaX = e.clientX - lastX;
-    chart.pan({ x: deltaX, y: 0 }, { duration: 0 });
-    lastX = e.clientX;
-  });
-  ctx.addEventListener('mouseup', endPan);
-  ctx.addEventListener('mouseleave', endPan);
+
 
   // Reset zoom button
   document.getElementById('resetZoom').onclick = () => chart.resetZoom();
