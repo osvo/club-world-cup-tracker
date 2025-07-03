@@ -82,7 +82,11 @@ const colPts = n => `hsl(${huePts[n] ?? 0} 75% 55%)`;
       plugins: {
         legend: { position: 'bottom', labels: { usePointStyle: true, boxWidth: 8 } },
         zoom: {
-          pan: { enabled: true, mode: 'x' },
+          pan: { 
+            enabled: true, 
+            mode: 'x',
+            modifierKey: null
+          },
           zoom: { wheel: { enabled: true }, pinch: { enabled: true }, mode: 'x' }
         }
       },
