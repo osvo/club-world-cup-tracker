@@ -120,9 +120,11 @@ canvas:active { cursor: grabbing; }
 table.dataTable thead th { white-space: nowrap; }
 
 td.match-cell {
-  max-width: 200px;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  /* Ensure enough width for "AAA vs BBB" string (approx 10–12 characters) */
+  min-width: 110px;
+  white-space: nowrap;        /* keep on one line */
+  overflow: hidden;           /* hide anything overflowing */
+  text-overflow: ellipsis;    /* show ellipsis if still too long */
 }
 
 .dataTables_scrollBody {

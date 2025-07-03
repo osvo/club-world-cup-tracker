@@ -114,7 +114,7 @@ const colPts = n => `hsl(${huePts[n] ?? 0} 75% 55%)`;
     { title: 'Score', data: 'actual' },
     ...friends.map(f => ({ title: f, data: f, createdCell: (td, _, row) => { td.style.background = colPts(row[`${f}_pts`]); } }))
   ];
-  new DataTable('#leaderboard', { data: tableData, columns, order: [[0,'asc']], paging: false, scrollY: '60vh', scrollX: true, scrollCollapse: true });
+  new DataTable('#leaderboard', { data: tableData, columns, order: [[0,'desc']], paging: false, scrollY: '60vh', scrollX: true, scrollCollapse: true });
 
   /* ==== splitter =================================================== */
   const drag = document.getElementById('dragBar');
