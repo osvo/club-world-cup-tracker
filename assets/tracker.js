@@ -15,6 +15,9 @@ const pts = (p, a) => {
 const huePts = { 0: 0, 2: 25, 3: 55, 5: 130 };
 const colPts = n => `hsl(${huePts[n] ?? 0} 75% 55%)`;
 
+// derive 3-letter team abbreviation (letters only, upper-case)
+const abbr = n => n.replace(/[^A-Za-z]/g, '').toUpperCase().slice(0, 3);
+
 /* ==== main ========================================================= */
 (async () => {
   // Load and parse CSV
@@ -26,7 +29,8 @@ const colPts = n => `hsl(${huePts[n] ?? 0} 75% 55%)`;
 
   // Compute match labels and points
   data.forEach(r => {
-    r.match = `${r.local} vs ${r.visitor}`.slice(0, 24);
+    r.match = `${abbr(r.local)} vs ${abbr(r.visitor)}`;
+    r.date = r.date.replace(/^\d{4}-/, '');
     friends.forEach(f => r[`${f}_pts`] = pts(r[f], r.score));
   });
 
